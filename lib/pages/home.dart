@@ -28,8 +28,8 @@ class MapConfig {
 class BiciMadConfig {
   // bicimad
   static final _server = 'https://rbdata.emtmadrid.es:8443/BiciMad';
-  static final _userId = 'WEB.SERV.javier.elizaga@gmail.com';
-  static final _userPassword = 'F3D2D9FB-0109-490E-89EB-1042C20116F1';
+  static final _userId = '';
+  static final _userPassword = '';
   static get stationsUrl => '$_server/getstations/$_userId/$_userPassword';
 }
 
