@@ -28,8 +28,8 @@ class MapConfig {
 class BiciMadConfig {
   // bicimad
   static final _server = 'https://rbdata.emtmadrid.es:8443/BiciMad';
-  static final _userId = '';
-  static final _userPassword = '';
+  static final _userId = '<add user id>';
+  static final _userPassword = '<add user password>';
   static get stationsUrl => '$_server/getstations/$_userId/$_userPassword';
 }
 
@@ -263,28 +263,30 @@ class _HomePageState extends State<HomePage> {
     return SafeArea(child: buttonTool);
   }
 
-  Icon _iosRefreshIcon(Color color) => Icon(
-        const IconData(
-          0xf49a,
+  Icon _iosRefreshIcon(Color color) {
+    return Icon(
+      const IconData(
+        0xf49a,
+        fontFamily: CupertinoIcons.iconFont,
+        fontPackage: CupertinoIcons.iconFontPackage,
+      ),
+      color: color,
+    );
+  }
+
+  RotatedIcon _iosLocationIcon(Color color) {
+    return RotatedIcon(
+      icon: Icon(
+        IconData(
+          0xf398,
           fontFamily: CupertinoIcons.iconFont,
           fontPackage: CupertinoIcons.iconFontPackage,
         ),
-        size: 35.0,
         color: color,
-      );
-
-  Widget _iosLocationIcon(Color color) => RotatedIcon(
-        icon: Icon(
-          IconData(
-            0xf398,
-            fontFamily: CupertinoIcons.iconFont,
-            fontPackage: CupertinoIcons.iconFontPackage,
-          ),
-          size: 25.0,
-          color: color,
-        ),
-        rotation: 0.1,
-      );
+      ),
+      rotation: 0.1,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {

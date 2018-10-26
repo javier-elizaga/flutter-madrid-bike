@@ -4,12 +4,22 @@ import 'package:flutter/material.dart';
 
 class AnimatedRotationIcon extends StatefulWidget {
   final Icon icon;
+  final double duration;
   final bool doAnimate;
 
-  AnimatedRotationIcon({this.icon, this.doAnimate, Key key}) : super(key: key);
+  AnimatedRotationIcon({
+    this.icon,
+    this.doAnimate,
+    this.duration = 600.0,
+    Key key,
+  }) : super(key: key);
 
   _AnimatedRotationIconState createState() {
-    return _AnimatedRotationIconState(icon: icon, doAnimate: doAnimate);
+    return _AnimatedRotationIconState(
+      icon: icon,
+      doAnimate: doAnimate,
+      duration: duration,
+    );
   }
 }
 
@@ -17,6 +27,8 @@ class _AnimatedRotationIconState extends State<AnimatedRotationIcon>
     with TickerProviderStateMixin {
   final Icon icon;
   bool doAnimate;
+  double duration;
+
   double _rotation = 0.0;
 
   Animation<double> _animation;
@@ -25,16 +37,20 @@ class _AnimatedRotationIconState extends State<AnimatedRotationIcon>
   _AnimatedRotationIconState({
     this.icon,
     this.doAnimate,
+    this.duration,
   });
 
   @override
   void didUpdateWidget(AnimatedRotationIcon oldWidget) {
     setState(() {
       doAnimate = widget.doAnimate;
+      duration = widget.duration;
     });
+    _controller.duration = Duration(milliseconds: duration.toInt());
     if (doAnimate) {
       _controller.forward(from: 0.0);
     }
+
     super.didUpdateWidget(oldWidget);
   }
 
@@ -42,7 +58,7 @@ class _AnimatedRotationIconState extends State<AnimatedRotationIcon>
   void initState() {
     super.initState();
     _controller = AnimationController(
-      duration: const Duration(milliseconds: 500),
+      duration: Duration(milliseconds: duration.toInt()),
       vsync: this,
     );
     _initAnimation();
@@ -55,10 +71,10 @@ class _AnimatedRotationIconState extends State<AnimatedRotationIcon>
   }
 
   void _initAnimation() {
-    _animation = CurvedAnimation(
-      parent: _controller,
-      curve: Curves.decelerate,
-    )
+    _animation = Tween(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(_controller)
       ..addListener(() {
         setState(() {
           _rotation = _animation.value;
