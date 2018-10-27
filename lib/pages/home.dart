@@ -16,6 +16,7 @@ import '../widget/common/animated_rotation_icon.dart';
 
 import 'package:flutter_location/flutter_location.dart';
 import 'package:flutter_location/permission.dart';
+import 'package:flutter_location/location.dart';
 
 class MapConfig {
   // flutter map
@@ -28,13 +29,10 @@ class MapConfig {
 class BiciMadConfig {
   // bicimad
   static final _server = 'https://rbdata.emtmadrid.es:8443/BiciMad';
-  static final _userId = '<add user id>';
-  static final _userPassword = '<add user password>';
+  static final _userId = 'WEB.SERV.javier.elizaga@gmail.com';
+  static final _userPassword = 'F3D2D9FB-0109-490E-89EB-1042C20116F1';
   static get stationsUrl => '$_server/getstations/$_userId/$_userPassword';
 }
-
-const double max_zoom = 17.0;
-const double def_zoom = 15.0;
 
 class HomePage extends StatefulWidget {
   static const route = '/';
@@ -42,7 +40,14 @@ class HomePage extends StatefulWidget {
   _HomePageState createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> {
+const double max_zoom = 17.0;
+const double def_zoom = 15.0;
+const double five_min_zoom = 15.0;
+const double bike_pin_size = 30.0;
+const double bike_icon_size = 20.0;
+const double circle_pin_size = 10.0;
+
+class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   // BiciMad stations
   List<Station> _stations = List();
 
@@ -62,79 +67,155 @@ class _HomePageState extends State<HomePage> {
 
   final _mapController = MapController();
 
+  double _zoom = def_zoom;
+
   @override
   void initState() {
     super.initState();
-    _initStations();
-    _initLocation();
+    initStations();
+    initLocations();
+  }
+
+  void initStations() {
+    try {
+      _initStations();
+    } catch (e) {
+      print('IS :: $e');
+    }
+  }
+
+  void initLocations() {
+    try {
+      _initLocation();
+    } catch (e) {
+      print('IL :: $e');
+    }
   }
 
   void _initStations() async {
-    try {
-      setState(() => _loadingStations = true);
-      List<Station> stations = await StationService.getStations();
-      if (mounted) {
-        setState(() {
-          _stations = stations;
-          _loadingStations = false;
-        });
-      }
-    } catch (e) {
-      print("initStations.error: $e");
-    }
+    print('IS :: Initializing stations');
+    print('IS :: $mounted');
+    setState(() => _loadingStations = true);
+    List<Station> stations = await StationService.getStations();
+    print('IS :: ${stations.length} stations found');
+    print('IS :: $mounted');
+    setState(() {
+      _stations = stations;
+      _loadingStations = false;
+    });
   }
 
   void _initLocation() async {
+    print('IL :: Initializing location');
     Permission locationPermission;
     locationPermission = await FlutterLocation.permissionLevel;
     if (locationPermission == Permission.NOT_DETERMINED) {
+      print('IL :: Location not_determined, waiting...');
       // Waiting for the user to authorized or denied permission
       return await Future.delayed(Duration(seconds: 1), _initLocation);
     }
-    LatLng myLocation;
+    LatLng center;
     if (locationPermission == Permission.AUTHORIZED) {
+      print('IL :: Location authorized');
       // we have location permissions
-      // initialize myLocation, center of the map to my location
-      try {
-        myLocation = await FlutterLocation.location.then(toLatLng);
-      } catch (e) {
-        print('Fail to locate user: $e');
-      }
+      // initialize center, center of the map to my location
+      Location location = await FlutterLocation.location;
+      center = toLatLng(location);
+      print('IL :: center: $center');
       _initializeOnLocationChange();
     }
-    if (mounted) {
-      setState(() {
-        _center = myLocation;
-        _locationPermission = locationPermission;
-      });
-    }
+    print('IL :: $mounted');
+    setState(() {
+      _center = center;
+      _locationPermission = locationPermission;
+    });
   }
 
   void _initializeOnLocationChange() {
-    FlutterLocation.onLocationChange.map((l) {
-      return toLatLng(l);
-    }).listen((myLocation) {
+    print('IOLC :: Initializing on location changed');
+    FlutterLocation.onLocationChanged.listen((Location newLocation) {
       if (mounted) {
-        setState(() => _myLocation = myLocation);
+        print('IOLC :: $mounted');
+        setState(() => _myLocation = toLatLng(newLocation));
       }
     });
   }
 
-  void _moveToMyLocation() {
+  void _moveToMyLocation() async {
+    if (_myLocation == null) {
+      print('MTML :: myLocation is null');
+      if (_locationPermission == Permission.AUTHORIZED) {
+        print('MTML :: getting my location');
+        Location location = await FlutterLocation.location;
+        print('MTML :: $mounted');
+        setState(() => _myLocation = toLatLng(location));
+      }
+    }
     if (_myLocation != null) {
-      _mapController.move(_myLocation, def_zoom);
+      _moveToLocationAnimated(_myLocation);
     }
   }
 
+  void _moveToLocationAnimated(LatLng newLocation) {
+    AnimationController _controller;
+    Animation<double> _animation;
+    LatLng oldLocation;
+    Tween<double> latTween, lngTween, zoomTween;
+
+    oldLocation = LatLng(
+      _mapController.center.latitude,
+      _mapController.center.longitude,
+    );
+    latTween = Tween<double>(
+      begin: oldLocation.latitude,
+      end: newLocation.latitude,
+    );
+    lngTween = Tween<double>(
+      begin: oldLocation.longitude,
+      end: newLocation.longitude,
+    );
+    zoomTween = Tween<double>(
+      begin: _mapController.zoom,
+      end: def_zoom,
+    );
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 500),
+      vsync: this,
+    );
+    _animation = CurvedAnimation(parent: _controller, curve: Curves.linear)
+      ..addListener(() {
+        _mapController.move(
+            LatLng(
+              latTween.evaluate(_animation),
+              lngTween.evaluate(_animation),
+            ),
+            zoomTween.evaluate(_animation));
+      })
+      ..addStatusListener((status) {
+        if (status == AnimationStatus.completed ||
+            status == AnimationStatus.dismissed) {
+          _controller.dispose();
+        }
+      });
+    _controller.forward();
+  }
+
   void _toogleViewMode() {
-    setState(() {
-      this._viewMode = this._viewMode == Mode.BIKE ? Mode.FOOD : Mode.BIKE;
-    });
+    final newViewMode = this._viewMode == Mode.BIKE ? Mode.FOOD : Mode.BIKE;
+    print(' TVM :: $mounted');
+    setState(() => this._viewMode = newViewMode);
   }
 
   Widget _buildFlutterMap() {
-    List<Marker> markers =
-        createMarkers(_stations ?? List(), _viewMode, _myLocation);
+    List<Marker> markers;
+    markers = createMarkers(
+      stations: _stations ?? List(),
+      mode: _viewMode,
+      circleLoc: _myLocation,
+      zoom: _zoom,
+    );
+    List<CircleMarker> circles;
+    circles = createCircles(_myLocation, _zoom);
     LatLng mapCenter;
     if (_locationPermission == Permission.AUTHORIZED) {
       mapCenter = _center;
@@ -144,10 +225,18 @@ class _HomePageState extends State<HomePage> {
     return FlutterMap(
       mapController: _mapController,
       options: MapOptions(
-        center: mapCenter,
-        zoom: def_zoom,
-        maxZoom: max_zoom,
-      ),
+          center: mapCenter,
+          zoom: def_zoom,
+          maxZoom: max_zoom,
+          onPositionChanged: (pos) {
+            if (mounted &&
+                _mapController != null &&
+                _zoom != _mapController.zoom) {
+              setState(() {
+                _zoom = _mapController.zoom;
+              });
+            }
+          }),
       layers: [
         TileLayerOptions(
           urlTemplate: MapConfig.urlTemplate,
@@ -156,16 +245,17 @@ class _HomePageState extends State<HomePage> {
             'id': 'mapbox.streets',
           },
         ),
-        MarkerLayerOptions(markers: markers)
+        CircleLayerOptions(circles: circles),
+        MarkerLayerOptions(markers: markers),
       ],
     );
   }
 
   Widget _buildMapScaffold(BuildContext context) {
+    print('BMS :: Building scaffold $_locationPermission');
     if (_locationPermission == Permission.NOT_DETERMINED) {
       return Loading();
     }
-
     final map = Stack(
       children: <Widget>[
         _buildFlutterMap(),
@@ -294,40 +384,80 @@ class _HomePageState extends State<HomePage> {
   }
 }
 
-const double bikePinSize = 30.0;
-const double circlePinSize = 20.0;
-
-List<Marker> createMarkers(
+// utils
+List<Marker> createMarkers({
   List<Station> stations,
   Mode mode,
-  LatLng myLocation,
-) {
-  List<Marker> markers = List();
+  LatLng circleLoc,
+  double zoom,
+}) {
+  double normalized = zoom - 11.0;
+  if (normalized < 1.0) {
+    normalized = 1.0;
+  }
+  double pinSize = normalized * 6;
+  double iconSize = pinSize / 1.5;
 
-  markers.addAll(stations.map((s) {
+  if (iconSize < 8.0) {
+    iconSize = 0.0;
+  }
+  List<Marker> markers = List();
+  markers.addAll(stations.map((station) {
     return Marker(
-      width: bikePinSize,
-      height: bikePinSize,
-      point: s.latLng,
-      builder: (context) => MapBikePin.fromStationAndMode(s, mode),
+      width: pinSize,
+      height: pinSize,
+      point: station.latLng,
+      builder: (context) {
+        return MapBikePin.fromStationAndMode(
+          station: station,
+          mode: mode,
+          size: iconSize,
+        );
+      },
     );
   }).toList());
 
-  if (myLocation != null) {
+  if (circleLoc != null) {
     markers.add(Marker(
-      width: circlePinSize,
-      height: circlePinSize,
-      point: myLocation,
-      builder: (context) => MapIconCircle(size: circlePinSize),
+      width: circle_pin_size,
+      height: circle_pin_size,
+      point: circleLoc,
+      builder: (context) {
+        return MapIconCircle(size: circle_pin_size);
+      },
     ));
   }
   return markers;
 }
 
-LatLng toLatLng(Map location) {
+List<CircleMarker> createCircles(LatLng location, double zoom) {
+  List<CircleMarker> circles = List();
+  if (location == null || zoom < five_min_zoom) {
+    print('location $location, zoom: $zoom');
+    return circles;
+  }
+  final fiveMin = LatLng(0.0035, 0.0044);
+  double x = 0.0;
+  int numOfPoints = 256;
+  double increment = 2 * pi / numOfPoints;
+  while (x < (2 * pi)) {
+    x += increment;
+    circles.add(CircleMarker(
+      point: LatLng(
+        fiveMin.latitude * sin(x) + location.latitude,
+        fiveMin.longitude * cos(x) + location.longitude,
+      ),
+      radius: 1.0,
+      color: Colors.indigo,
+    ));
+  }
+  return circles;
+}
+
+LatLng toLatLng(Location location) {
   return LatLng(
-    location['latitude'],
-    location['longitude'],
+    location.latitude,
+    location.longitude,
   );
 }
 

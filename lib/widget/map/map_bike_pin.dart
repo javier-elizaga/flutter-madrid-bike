@@ -40,15 +40,19 @@ class MapBikePin extends StatefulWidget {
   static IconData directionsBike = Icons.directions_bike;
   static IconData localParking = Icons.local_parking;
 
-  factory MapBikePin.fromStationAndMode(Station station, Mode mode) {
-    Key key = Key('station_${mode.index}_${station.id}');
+  factory MapBikePin.fromStationAndMode({
+    Station station,
+    Mode mode,
+    double size,
+  }) {
+    Key key = Key('station_${mode.index}_${station.id}_$size');
     return MapBikePin(
       icon: mode == Mode.FOOD ? directionsBike : localParking,
       number: mode == Mode.FOOD ? station.dockBikes : station.freeBases,
+      size: size,
       key: key,
     );
   }
-
   _MapBikePinState createState() {
     Color color = _color();
     return _MapBikePinState(
@@ -106,7 +110,7 @@ class _MapBikePinState extends State<MapBikePin> {
         number.toString(),
         style: TextStyle(
           color: Colors.white,
-          fontSize: 20.0,
+          fontSize: size,
         ),
       ),
     );
