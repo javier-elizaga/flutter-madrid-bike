@@ -6,11 +6,13 @@ class AnimatedRotationIcon extends StatefulWidget {
   final Icon icon;
   final double duration;
   final bool doAnimate;
+  final bool clockwise;
 
   AnimatedRotationIcon({
     this.icon,
     this.doAnimate,
     this.duration = 600.0,
+    this.clockwise = true,
     Key key,
   }) : super(key: key);
 
@@ -19,6 +21,7 @@ class AnimatedRotationIcon extends StatefulWidget {
       icon: icon,
       doAnimate: doAnimate,
       duration: duration,
+      clockwise: clockwise,
     );
   }
 }
@@ -26,8 +29,10 @@ class AnimatedRotationIcon extends StatefulWidget {
 class _AnimatedRotationIconState extends State<AnimatedRotationIcon>
     with TickerProviderStateMixin {
   final Icon icon;
+
   bool doAnimate;
   double duration;
+  bool clockwise;
 
   double _rotation = 0.0;
 
@@ -38,6 +43,7 @@ class _AnimatedRotationIconState extends State<AnimatedRotationIcon>
     this.icon,
     this.doAnimate,
     this.duration,
+    this.clockwise,
   });
 
   @override
@@ -45,6 +51,7 @@ class _AnimatedRotationIconState extends State<AnimatedRotationIcon>
     setState(() {
       doAnimate = widget.doAnimate;
       duration = widget.duration;
+      clockwise = widget.clockwise;
     });
     _controller.duration = Duration(milliseconds: duration.toInt());
     if (doAnimate) {
@@ -93,8 +100,9 @@ class _AnimatedRotationIconState extends State<AnimatedRotationIcon>
   }
 
   Widget build(BuildContext context) {
+    double rotation = (clockwise ? 1.0 : -1.0) * _rotation;
     return Container(
-      child: RotatedIcon(icon: icon, rotation: _rotation),
+      child: RotatedIcon(icon: icon, rotation: rotation),
     );
   }
 }

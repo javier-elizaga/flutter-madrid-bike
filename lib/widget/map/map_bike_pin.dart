@@ -1,8 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
-import '../../model/station.dart';
-import '../../model/mode.dart';
+const toogle_number_icon_duration = Duration(seconds: 2);
 
 /*
  * MapBikePin is an icon that switch from icon to number on tab 
@@ -11,72 +10,23 @@ class MapBikePin extends StatefulWidget {
   final IconData icon;
   final int number;
   final double size;
-
-  final Color green;
-  final Color amber;
-  final Color red;
-  final Color grey;
-
-  final int greenLimit;
-  final int amberLimit;
-  final int redLimit;
-  final int greyLimit;
+  final Color color;
 
   MapBikePin({
     this.icon,
     this.number,
-    this.size = 20.0,
-    this.green = Colors.green,
-    this.amber = Colors.amber,
-    this.red = Colors.red,
-    this.grey = Colors.grey,
-    this.greenLimit = 4,
-    this.amberLimit = 3,
-    this.redLimit = 1,
-    this.greyLimit = 0,
+    this.size,
+    this.color,
     Key key,
   }) : super(key: key);
 
-  static IconData directionsBike = Icons.directions_bike;
-  static IconData localParking = Icons.local_parking;
-
-  factory MapBikePin.fromStationAndMode({
-    Station station,
-    Mode mode,
-    double size,
-  }) {
-    Key key = Key('station_${mode.index}_${station.id}_$size');
-    return MapBikePin(
-      icon: mode == Mode.FOOD ? directionsBike : localParking,
-      number: mode == Mode.FOOD ? station.dockBikes : station.freeBases,
-      size: size,
-      key: key,
-    );
-  }
   _MapBikePinState createState() {
-    Color color = _color();
     return _MapBikePinState(
       color: color,
       icon: icon,
       number: number,
       size: size,
     );
-  }
-
-  Color _color() {
-    Color color;
-    if (number >= greenLimit) {
-      color = green;
-    } else if (number >= amberLimit) {
-      color = Colors.amber;
-    } else if (number >= redLimit) {
-      color = Colors.red;
-    } else if (number >= greyLimit) {
-      color = Colors.grey;
-    } else {
-      color = Colors.white;
-    }
-    return color;
   }
 }
 
@@ -93,7 +43,6 @@ class _MapBikePinState extends State<MapBikePin> {
     this.size,
   });
 
-  // state
   bool showNumber = false;
 
   Widget _icon() {
@@ -117,24 +66,22 @@ class _MapBikePinState extends State<MapBikePin> {
   }
 
   void _onTap() async {
-    if (showNumber) {
-      return;
+    setState(() => showNumber = true);
+    await Future.delayed(toogle_number_icon_duration);
+    // after 2 seconds it is posible the widget is no longer mounted
+    if (this.mounted) {
+      setState(() => showNumber = false);
     }
-    setState(() {
-      showNumber = true;
-    });
-    Future.delayed(Duration(seconds: 2)).then((val) {
-      // after 2 seconds it is posible the widget is no longer mounted
-      if (this.mounted) {
-        setState(() {
-          showNumber = false;
-        });
-      }
-    });
   }
 
   @override
   Widget build(BuildContext context) {
+    Widget child;
+    if (showNumber) {
+      child = _numberIcon();
+    } else {
+      child = _icon();
+    }
     return GestureDetector(
       onTap: _onTap,
       child: Container(
@@ -142,7 +89,7 @@ class _MapBikePinState extends State<MapBikePin> {
           shape: BoxShape.circle,
           color: color,
         ),
-        child: showNumber ? _numberIcon() : _icon(),
+        child: child,
       ),
     );
   }
