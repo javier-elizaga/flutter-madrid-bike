@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'pages/home.dart';
 
 // import 'x/animation_from_parent.dart';
-
 // void main() => runApp(AnimationFromParent());
 
 void main() => runApp(MadridBikeApp());

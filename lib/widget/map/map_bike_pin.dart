@@ -36,33 +36,51 @@ class _MapBikePinState extends State<MapBikePin> {
   final int number;
   final double size;
 
+  double _innerSize;
+
   _MapBikePinState({
     this.color,
     this.icon,
     this.number,
     this.size,
-  });
+  }) {
+    _innerSize = size / 1.1;
+  }
 
   bool showNumber = false;
 
-  Widget _icon() {
-    return Icon(
-      icon,
-      color: Colors.white,
-      size: size,
+  Widget _wrapInCircle(Widget child) {
+    return Container(
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: color,
+      ),
+      height: size,
+      width: size,
+      child: child,
     );
   }
 
+  Widget _icon() {
+    final child = Icon(
+      icon,
+      color: Colors.white,
+      size: _innerSize,
+    );
+    return _wrapInCircle(child);
+  }
+
   Widget _numberIcon() {
-    return Center(
+    final child = Center(
       child: Text(
-        number.toString(),
+        '$number',
         style: TextStyle(
           color: Colors.white,
-          fontSize: size,
+          fontSize: _innerSize,
         ),
       ),
     );
+    return _wrapInCircle(child);
   }
 
   void _onTap() async {
@@ -82,15 +100,9 @@ class _MapBikePinState extends State<MapBikePin> {
     } else {
       child = _icon();
     }
-    return GestureDetector(
+    return InkWell(
       onTap: _onTap,
-      child: Container(
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: color,
-        ),
-        child: child,
-      ),
+      child: child,
     );
   }
 }

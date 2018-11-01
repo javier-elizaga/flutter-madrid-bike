@@ -28,27 +28,27 @@ class _MapState extends State<Map> with TickerProviderStateMixin {
   LatLng _myLocation;
   Stream<Location> _locationStream;
   List<Station> _stations = List();
-  double _zoom = MapConfig.def_zoom;
+  double _zoom = MapConfig.init_map_zoom;
 
-  Timer _autoFetchStations;
+  Timer _getStationTimer;
   bool _isLoadingStations = false;
 
   @override
   void initState() {
     super.initState();
     initStations();
-    initLocations();
+    initLocation();
     initTimer();
   }
 
   @override
   void dispose() {
     super.dispose();
-    _autoFetchStations.cancel();
+    _getStationTimer.cancel();
   }
 
   initTimer() {
-    _autoFetchStations = Timer.periodic(MapConfig.fetchStationsEvery, (timer) {
+    _getStationTimer = Timer.periodic(MapConfig.get_stations_interval, (timer) {
       initStations();
     });
   }
@@ -56,7 +56,26 @@ class _MapState extends State<Map> with TickerProviderStateMixin {
   Future<void> initStations() async {
     try {
       await _initStations();
-    } catch (e) {}
+    } catch (e) {
+      print("initStations error: $e");
+    }
+  }
+
+  Future<void> initLocation() async {
+    try {
+      await _initLocation();
+    } catch (e) {
+      print("initLocation error: $e");
+    }
+  }
+
+  Future<Permission> initPermission() async {
+    try {
+      return await _initPermission();
+    } catch (e) {
+      print("initPermission error: $e");
+    }
+    return Permission.NOT_DETERMINED;
   }
 
   Future<void> _initStations() async {
@@ -68,13 +87,6 @@ class _MapState extends State<Map> with TickerProviderStateMixin {
     });
   }
 
-  Future<void> initLocations() async {
-    try {
-      await _initLocation();
-    } catch (e) {}
-    return;
-  }
-
   LatLng _toLatLng(Location location) {
     return LatLng(
       location.latitude,
@@ -82,22 +94,33 @@ class _MapState extends State<Map> with TickerProviderStateMixin {
     );
   }
 
-  Future<void> _initLocation() async {
-    Permission locationPermission;
-    locationPermission = await FlutterLocation.permissionLevel;
-    if (locationPermission == Permission.NOT_DETERMINED) {
-      // Waiting for the user to authorized or denied permission
-      return await Future.delayed(Duration(seconds: 1), _initLocation);
+  Future<Permission> _initPermission() async {
+    Permission permission;
+    final _waitForUser = Duration(seconds: 1);
+    bool isDetermined = false;
+    await FlutterLocation.requestPermission;
+    while (!isDetermined) {
+      permission = await FlutterLocation.permission;
+      if (permission == Permission.NOT_DETERMINED) {
+        await Future.delayed(_waitForUser);
+      } else {
+        isDetermined = true;
+      }
     }
+    return permission;
+  }
+
+  Future<void> _initLocation() async {
+    Permission permission = await initPermission();
     LatLng center;
-    if (locationPermission == Permission.AUTHORIZED) {
+    if (permission == Permission.AUTHORIZED) {
       // we have location permissions
       // initialize center, center of the map to my location
       center = await FlutterLocation.location.then(_toLatLng);
       _initOnLocationChange();
     }
     setState(() {
-      this._locationPermission = locationPermission;
+      this._locationPermission = permission;
       this._myLocation = center;
     });
   }
@@ -145,7 +168,7 @@ class _MapState extends State<Map> with TickerProviderStateMixin {
     );
     zoomTween = Tween<double>(
       begin: _mapController.zoom,
-      end: MapConfig.def_zoom,
+      end: MapConfig.init_map_zoom,
     );
     _controller = AnimationController(
       duration: const Duration(milliseconds: 500),
@@ -174,9 +197,8 @@ class _MapState extends State<Map> with TickerProviderStateMixin {
     setState(() => this._viewMode = newViewMode);
   }
 
-  Widget _buildFlutterMap(BuildContext context) {
+  List<Marker> _createMapMarkers() {
     List<Marker> markers = List();
-    List<Polyline> fiveMinWalk = List();
     if (_stations != null) {
       markers.addAll(MapUtils.createStationMarkers(
         stations: _stations,
@@ -184,14 +206,25 @@ class _MapState extends State<Map> with TickerProviderStateMixin {
         zoom: _zoom,
       ));
     }
+
     if (_myLocation != null) {
       markers.add(MapUtils.createMyLocationMarker(_myLocation));
-      if (_zoom > MapConfig.min_five_min_zoom) {
+      if (_zoom > MapConfig.min_full_icon_zoom) {
         markers.add(MapUtils.createFiveMinMarker(_myLocation, _zoom));
-        fiveMinWalk = MapUtils.fiveMinWalkPolyline(_myLocation);
       }
     }
+    return markers;
+  }
 
+  List<Polyline> _createMapPolyline() {
+    List<Polyline> fiveMinWalk = List();
+    if (_myLocation != null && _zoom > MapConfig.min_full_icon_zoom) {
+      fiveMinWalk = MapUtils.fiveMinWalkPolyline(_myLocation);
+    }
+    return fiveMinWalk;
+  }
+
+  LatLng get mapCenter {
     LatLng mapCenter;
     if (_locationPermission == Permission.AUTHORIZED) {
       mapCenter = _myLocation;
@@ -201,14 +234,17 @@ class _MapState extends State<Map> with TickerProviderStateMixin {
         defaultCenter: MapConfig.defaultCenter,
       );
     }
+    return mapCenter;
+  }
 
+  Widget _buildFlutterMap(BuildContext context) {
     return FlutterMap(
       mapController: _mapController,
       options: MapOptions(
           center: mapCenter,
-          maxZoom: MapConfig.max_zoom,
-          minZoom: MapConfig.min_zoom,
-          zoom: MapConfig.def_zoom,
+          maxZoom: MapConfig.max_map_zoom,
+          minZoom: MapConfig.min_map_zoom,
+          zoom: MapConfig.init_map_zoom,
           onPositionChanged: (pos) {
             if (mounted &&
                 _mapController != null &&
@@ -224,8 +260,8 @@ class _MapState extends State<Map> with TickerProviderStateMixin {
             'id': 'mapbox.streets',
           },
         ),
-        PolylineLayerOptions(polylines: fiveMinWalk),
-        MarkerLayerOptions(markers: markers),
+        PolylineLayerOptions(polylines: _createMapPolyline()),
+        MarkerLayerOptions(markers: _createMapMarkers()),
       ],
     );
   }
@@ -249,10 +285,10 @@ class _MapState extends State<Map> with TickerProviderStateMixin {
       return Loading();
     }
 
-    IconData directionsBike = Icons.directions_bike;
-    IconData localParking = Icons.local_parking;
+    IconData foodModeIcon = Icons.directions_walk;
+    IconData bikeModeIcon = Icons.directions_bike;
     Widget floatingAction = MapModeButton(
-      icon: Icon(_viewMode == Mode.BIKE ? directionsBike : localParking),
+      icon: Icon(_viewMode == Mode.FOOD ? foodModeIcon : bikeModeIcon),
       onPressed: _toogleViewMode,
     );
 

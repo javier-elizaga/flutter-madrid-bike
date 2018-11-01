@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong/latlong.dart';
+import 'package:madrid_bike/widget/map/map_config.dart';
 
 import '../../model/mode.dart';
 import '../../model/station.dart';
@@ -36,15 +37,6 @@ class MapUtils {
       color = Colors.white;
     }
     return color;
-  }
-
-  static double _getPinSizeBy({double zoom}) {
-    double normalized = zoom - 11.0;
-    if (normalized < 1.0) {
-      normalized = 1.0;
-    }
-    double pinSize = normalized * 6;
-    return pinSize;
   }
 
   static Widget _stationPin(Station station, Mode mode, double size) {
@@ -83,21 +75,19 @@ class MapUtils {
     );
   }
 
-  static Marker _stationMarker(
-    Station station,
-    Mode mode,
-    double pinSize,
-    double iconSize,
-  ) {
+  static Marker _stationMarker(Station station, Mode mode, double zoom) {
+    double pinSize = MapConfig.getPinSizeBy(zoom: zoom);
+    double iconSize = pinSize / 1.5;
+    bool showIcon = zoom > MapConfig.min_full_icon_zoom;
     return Marker(
-      width: pinSize,
-      height: pinSize,
+      width: pinSize, // touchable area is bigger than actual icon
+      height: pinSize, // touchable area is bigger than actual icon
       point: station.latLng,
       builder: (context) {
-        if (iconSize == 0.0) {
-          return _stationPinLittle(station, mode, iconSize);
+        if (showIcon) {
+          return _stationPin(station, mode, iconSize);
         }
-        return _stationPin(station, mode, iconSize);
+        return _stationPinLittle(station, mode, iconSize);
       },
     );
   }
@@ -119,21 +109,13 @@ class MapUtils {
     Mode mode,
     double zoom,
   }) {
-    double pinSize = _getPinSizeBy(zoom: zoom);
-    double iconSize = pinSize / 1.5;
-    if (iconSize < 8.0) {
-      iconSize = 0.0;
-    }
-    List<Marker> markers = List();
-    markers.addAll(stations.map((station) {
+    return stations.map((station) {
       return _stationMarker(
         station,
         mode,
-        pinSize,
-        iconSize,
+        zoom,
       );
-    }).toList());
-    return markers;
+    }).toList();
   }
 
   static LatLng getCenterOf({List<Station> stations, LatLng defaultCenter}) {
@@ -153,25 +135,45 @@ class MapUtils {
   }
 
   static Marker createFiveMinMarker(LatLng location, double zoom) {
-    double pinSize = _getPinSizeBy(zoom: zoom);
-    double iconSize = pinSize / 1.5;
-
+    double pinSize = MapConfig.getFiveMinSizeBy(zoom: zoom);
     final position = LatLng(
       fiveMinDistance.latitude * sin(pi / 2) + location.latitude,
       fiveMinDistance.longitude * cos(pi / 2) + location.longitude,
     );
-
     return Marker(
       width: pinSize,
       height: pinSize,
       point: position,
       builder: (context) {
-        return MapFiveMinIcon(size: iconSize);
+        return MapFiveMinIcon(size: pinSize);
       },
     );
   }
 
   static List<Polyline> fiveMinWalkPolyline(LatLng location) {
+    const Color strokeColor = const Color.fromRGBO(100, 133, 245, .9);
+    const double strokeWidth = 2.0;
+
+    List<Polyline> polylines = List();
+    List<LatLng> points = List();
+    int numOfPoints = 256;
+    double increment = 2 * pi / numOfPoints;
+    for (double x = 0.0; x < (2 * pi); x += increment) {
+      points.add(LatLng(
+        fiveMinDistance.latitude * sin(x) + location.latitude,
+        fiveMinDistance.longitude * cos(x) + location.longitude,
+      ));
+    }
+    polylines.add(Polyline(
+      points: points,
+      isDotted: false,
+      color: strokeColor,
+      strokeWidth: strokeWidth,
+    ));
+    return polylines;
+  }
+
+  static List<Polyline> fiveMinWalkPolylineDashed(LatLng location) {
     const Color strokeColor = const Color.fromRGBO(100, 133, 245, .9);
     const double strokeWidth = 2.0;
 
